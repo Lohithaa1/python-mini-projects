@@ -1,0 +1,123 @@
+import httpx
+from config.settings import settings
+from utils.logger import logger
+
+class PermitClient:
+    def __init__(self):
+        self.base_url = f"{settings.BASE_URL}/schema/{settings.PROJECT_ID}/{settings.ENV_ID}/resources"
+        self.headers = {"Authorization": f"Bearer {settings.API_KEY}"}
+
+    async def create_resource(self, resource_data):
+        url = self.base_url
+        logger.info(f"Creating resource with data: {resource_data}")
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, headers=self.headers, json=resource_data)
+                response.raise_for_status()
+                logger.info("Resource created successfully.")
+                return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error occurred while creating resource: {str(e)}")
+            raise
+
+    async def create_instance(self, instance_data):
+        url = f"{self.base_url}/instances"
+        logger.info(f"Creating resource instance with data: {instance_data}")
+        
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(url, headers=self.headers, json=instance_data)
+                response.raise_for_status()
+                logger.info("Resource instance created successfully.")
+                return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error occurred: {e.response.status_code} - {e.response.text}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error occurred while creating instance: {str(e)}")
+            raise
+
+
+
+
+import json
+from utils.logger import logger
+
+class JSONHandler:
+    @staticmethod
+    def save_to_json(data, file_path):
+        try:
+            with open(file_path, "w") as f:
+                json.dump(data, f, indent=4)
+            logger.info(f"Data successfully saved to {file_path}.")
+        except Exception as e:
+            logger.error(f"Failed to save data to {file_path}: {str(e)}")
+
+    @staticmethod
+    def append_to_json(data, file_path):
+        try:
+            with open(file_path, "r+") as f:
+                existing_data = json.load(f)
+                existing_data.append(data)
+                f.seek(0)
+                json.dump(existing_data, f, indent=4)
+            logger.info(f"Data successfully appended to {file_path}.")
+        except FileNotFoundError:
+            logger.warning(f"{file_path} not found. Creating a new file.")
+            JSONHandler.save_to_json([data], file_path)
+        except Exception as e:
+            logger.error(f"Failed to append data to {file_path}: {str(e)}")
+
+
+
+from loguru import logger
+
+# Configure loguru logger to write logs to a file and display them on console
+logger.add("logs/project.log", rotation="500 MB", level="DEBUG", backtrace=True, diagnose=True)
+logger.info("Logger is set up and ready.")
+
+
+
+import asyncio
+import json
+from services.permit_client import PermitClient
+from services.json_handler import JSONHandler
+from models.resource_type_model import ResourceTypeModel
+from utils.logger import logger
+
+async def main():
+    client = PermitClient()
+    
+    # Load the resource template
+    try:
+        with open("templates/resource_template.json", "r") as f:
+            resource_data = json.load(f)
+        logger.info("Resource template loaded successfully.")
+    except Exception as e:
+        logger.error(f"Failed to load resource template: {str(e)}")
+        return
+
+    # Validate resource data using ResourceTypeModel
+    try:
+        resource = ResourceTypeModel(**resource_data)
+        logger.info("Resource data validated successfully.")
+    except Exception as e:
+        logger.error(f"Validation failed: {e}")
+        return
+
+    # Create the resource in Permit.io
+    try:
+        response = await client.create_resource(resource.dict())
+        logger.info(f"Created resource: {response}")
+
+        # Log response to JSON file
+        JSONHandler.append_to_json(response, "resources.json")
+    except Exception as e:
+        logger.error(f"Failed to create resource: {e}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
