@@ -1,0 +1,122 @@
+{
+  "key": "resource_key",                       // URL-friendly identifier for the resource (e.g., "platform_org")
+  "name": "Resource Name",                     // Human-readable name (e.g., "Platform Organization")
+  "urn": "urn:resource:example",               // Optional; Uniform Resource Name for the resource
+  "description": "Description of the resource", // Optional; longer description of the resource
+
+  "actions": {                                 // Actions represent interactions with this resource
+    "read": {},
+    "write": {},
+    "manage": {}
+  },
+
+  "type_attributes": {                         // Optional; metadata for filtering resources (ABAC policies)
+    "example_attribute": "example_value"
+  },
+
+  "attributes": {                              // Attributes specific to this resource, for ABAC policies
+    "created_at": {
+      "type": "time",
+      "description": "Timestamp for resource creation"
+    },
+    "region": {
+      "type": "string",
+      "description": "Geographical region of the resource"
+    }
+  },
+
+  "roles": {                                   // Roles and associated permissions for the resource
+    "manager": {
+      "name": "manager",
+      "permissions": ["manage"],
+      "description": "Manager with full access"
+    },
+    "viewer": {
+      "name": "viewer",
+      "permissions": ["read"],
+      "description": "Viewer with read-only access"
+    }
+  },
+
+  "relations": {                               // Relations to other resources (for ReBAC hierarchy)
+    "parent": "root"                           // e.g., the "parent" relation links to the "root" resource
+  }
+}
+
+
+
+
+
+
+{
+  "key": "instance_key",                        // Unique identifier for the instance (e.g., "account_001")
+  "resource": "resource_type_key",              // Key of the resource type this instance belongs to (e.g., "account")
+  "tenant": "tenant_key",                       // Key of the tenant the instance belongs to (e.g., "client_org_001")
+
+  "attributes": {                               // Attributes specific to this instance
+    "owner": "user123",
+    "private": "false"
+  }
+}
+
+
+
+
+
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, List
+
+# Define Action model for resource actions
+class Action(BaseModel):
+    """Defines an action for a resource."""
+    pass
+
+# Define Attribute model for resource attributes
+class Attribute(BaseModel):
+    """Defines an attribute's type and description for ABAC policies."""
+    type: str
+    description: Optional[str] = None
+
+# Define Role model for resource roles
+class Role(BaseModel):
+    """Defines a role with permissions and optional description."""
+    name: str
+    permissions: List[str]
+    description: Optional[str] = None
+
+# Define ResourceType model for defining resources
+class ResourceType(BaseModel):
+    """Represents the structure of a resource type for creation."""
+    key: str = Field(..., description="Unique identifier for the resource type")
+    name: str = Field(..., description="Human-readable name of the resource")
+    urn: Optional[str] = Field(None, description="Uniform Resource Name (URN) of the resource")
+    description: Optional[str] = Field(None, description="Optional description of the resource")
+    actions: Dict[str, Action] = Field(..., description="Actions available on the resource")
+    type_attributes: Optional[Dict[str, str]] = Field(
+        None, description="Metadata for filtering resources"
+    )
+    attributes: Optional[Dict[str, Attribute]] = Field(
+        None, description="Additional attributes for ABAC policies"
+    )
+    roles: Dict[str, Role] = Field(..., description="Roles associated with the resource")
+    relations: Optional[Dict[str, str]] = Field(
+        None, description="Relationships to other resources for ReBAC"
+    )
+
+
+
+
+
+
+from pydantic import BaseModel, Field
+from typing import Optional, Dict
+
+# Define ResourceInstance model for creating instances
+class ResourceInstance(BaseModel):
+    """Defines the structure of a resource instance for creation."""
+    key: str = Field(..., description="Unique identifier for the resource instance")
+    resource: str = Field(..., description="Key of the resource type this instance belongs to")
+    tenant: str = Field(..., description="Key of the tenant that this resource instance belongs to")
+    attributes: Optional[Dict[str, str]] = Field(
+        None, description="Attributes specific to this instance for ABAC policies"
+    )
