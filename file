@@ -1,0 +1,140 @@
+import json
+import os
+from pathlib import Path
+from typing import Any, Dict
+import aiofiles
+
+
+class JSONHandler:
+    def __init__(self, base_dir: str = "org_struct"):
+        """
+        Initialize the JSONHandler to manage JSON files.
+
+        :param base_dir: Base directory to store JSON files.
+        """
+        self.base_dir = base_dir
+        Path(self.base_dir).mkdir(parents=True, exist_ok=True)
+
+    async def write_to_main_json(self, data: Dict[str, Any], file_name: str = "main_org.json"):
+        """
+        Write or append to the main organization structure JSON file asynchronously.
+
+        :param data: The data to write to the main JSON file.
+        :param file_name: The name of the main JSON file.
+        """
+        file_path = os.path.join(self.base_dir, file_name)
+        existing_data = []
+
+        if os.path.exists(file_path):
+            async with aiofiles.open(file_path, mode="r") as f:
+                content = await f.read()
+                if content:
+                    existing_data = json.loads(content)
+
+        existing_data.append(data)
+        async with aiofiles.open(file_path, mode="w") as f:
+            await f.write(json.dumps(existing_data, indent=4))
+
+    async def write_to_account_resource_json(self, account_key: str, data: Dict[str, Any]):
+        """
+        Write data for resources under 'Accounts' to separate JSON files asynchronously.
+
+        :param account_key: The key of the account to use for the file name.
+        :param data: The resource data to write.
+        """
+        file_name = f"{account_key}.json"
+        file_path = os.path.join(self.base_dir, file_name)
+        existing_data = []
+
+        if os.path.exists(file_path):
+            async with aiofiles.open(file_path, mode="r") as f:
+                content = await f.read()
+                if content:
+                    existing_data = json.loads(content)
+
+        existing_data.append(data)
+        async with aiofiles.open(file_path, mode="w") as f:
+            await f.write(json.dumps(existing_data, indent=4))
+
+
+import asyncio
+import json
+import logging
+from services.permit_client import PermitClient
+from services.json_handler import JSONHandler
+from models.resource_type_model import ResourceType
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+async def main():
+    client = PermitClient()
+    json_handler = JSONHandler()
+
+    # Load the resource template
+    try:
+        with open("templates/resource_template.json", "r") as f:
+            resource_data = json.load(f)
+            logger.info("Resource template loaded successfully.")
+    except Exception as e:
+        logger.error(f"Failed to load resource template: {str(e)}")
+        return
+
+    # Extract relations from the template
+    relations = resource_data.pop("relations", None)
+
+    # Validate resource data
+    try:
+        resource = ResourceType(**resource_data)
+        logger.info("Resource data validated successfully.")
+    except Exception as e:
+        logger.error(f"Validation failed: {e}")
+        return
+
+    # Create the resource in Permit.io
+    try:
+        created_resource = await client.create_resource(resource.model_dump())
+        logger.info(f"Created resource: {created_resource}")
+    except Exception as e:
+        logger.error(f"Failed to create resource: {e}")
+        return
+
+    # Process relations if they exist
+    if relations:
+        resource_id = created_resource["key"]
+        for relation_key, relation_details in relations.items():
+            relation_data = {
+                "key": relation_key,
+                "name": relation_key,
+                "description": relation_details.get("description", f"{relation_key} relation"),
+                "subject_resource": relation_details.get("subject_resource"),
+            }
+            try:
+                await client.create_resource_relation(resource_id, relation_data)
+                logger.info(f"Created relation for resource: {relation_data}")
+            except Exception as e:
+                logger.error(f"Failed to create relation: {e}")
+                return
+
+    # Write the created resource to JSON files based on its parent
+    try:
+        parent = resource_data.get("relations", {}).get("parent", None)
+        if parent == "Accounts":
+            await json_handler.write_to_account_resource_json(
+                account_key=created_resource["key"],
+                data=created_resource,
+            )
+            logger.info(f"Resource written to separate file: {created_resource['key']}.json")
+        else:
+            await json_handler.write_to_main_json(created_resource)
+            logger.info("Resource written to main_org.json")
+    except Exception as e:
+        logger.error(f"Failed to write resource to JSON files: {e}")
+        return
+
+    logger.info("Resource creation and processing completed successfully.")
+
+# Run the async main function
+if __name__ == "__main__":
+    asyncio.run(main())
