@@ -1,0 +1,73 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+env/
+venv/
+ENV/
+.venv/
+virtualenv/
+.virtualenv/
+
+# Pipenv files
+Pipfile.lock
+
+# Python egg files
+*.egg
+*.egg-info/
+dist/
+build/
+*.wheel
+
+# Test and Coverage files
+.coverage
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# pyenv
+.python-version
+
+# IDE / Editor files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# MacOS
+.DS_Store
+
+# Windows
+Thumbs.db
+desktop.ini
+
+# Logs and debugging
+*.log
+*.out
+*.err
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*.old
+*.orig
+
+# Generated JSON files
+org_struct/
+*.json
+
+# Environment files
+.env
+.env.*
+
+# Ignore local files
+*.local
+*.config
